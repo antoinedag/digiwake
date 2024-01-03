@@ -45,15 +45,12 @@ void loop() {
   delay(500); // Attendre 500 millisecondes (demi-seconde)
 
   display.clearDisplay();
-  display.setTextSize(1);
+ display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.print(now.year(), DEC);
-  display.print('/');
-  display.print(now.month(), DEC);
-  display.print('/');
-  display.print(now.day(), DEC);
-  display.setCursor(0, 10);
+  int16_t x, y;
+  uint16_t w, h;
+  display.getTextBounds("00:00:00", 0, 0, &x, &y, &w, &h);  // Obtient les dimensions du texte
+  display.setCursor((SCREEN_WIDTH - w) / 2, (SCREEN_HEIGHT - h) / 2);
   display.print(now.hour(), DEC);
   display.print(':');
   display.print(now.minute(), DEC);
