@@ -23,6 +23,38 @@ RTC_DS1307 rtc;
 DateTime alarmTime;
 bool alarmSet = false;
 
+void adjustTime(DateTime currentTime, int secondsToAdd) {   //permet d'eviter les erreurs quand le reglage trop rapide
+  DateTime newTime = currentTime + TimeSpan(secondsToAdd);
+  rtc.adjust(newTime);
+  delay(500); 
+}
+
+void displayTime(DateTime currentTime) {
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+
+  int16_t x, y;
+  uint16_t w, h;
+  display.getTextBounds("00:00:00", 0, 0, &x, &y, &w, &h);  // Obtient les dimensions du texte
+  display.setCursor((SCREEN_WIDTH - w) / 2, (SCREEN_HEIGHT - h) / 2);
+  display.print(currentTime.hour(), DEC);
+  display.print(':');
+  display.print(currentTime.minute(), DEC);
+  display.print(':');
+  display.print(currentTime.second(), DEC);
+
+  display.display();
+  delay(1000);
+}
+
+void soundAlarm() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(1000); // Alarme sonne pendant 1 seconde
+  digitalWrite(BUZZER_PIN, LOW);
+  alarmSet = false; // Réinitialise l'alarme
+}
+
 void setup() {            // vérification que le systeme reconnait bien les composants
   Serial.begin(9600);
 
@@ -70,34 +102,3 @@ void loop() {
   displayTime(now);
 }
 
-void adjustTime(DateTime currentTime, int secondsToAdd) {   //permet d'eviter les erreurs quand le reglage trop rapide
-  DateTime newTime = currentTime + TimeSpan(secondsToAdd);
-  rtc.adjust(newTime);
-  delay(500); 
-}
-
-void displayTime(DateTime currentTime) {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(SSD1306_WHITE);
-
-  int16_t x, y;
-  uint16_t w, h;
-  display.getTextBounds("00:00:00", 0, 0, &x, &y, &w, &h);  // Obtient les dimensions du texte
-  display.setCursor((SCREEN_WIDTH - w) / 2, (SCREEN_HEIGHT - h) / 2);
-  display.print(currentTime.hour(), DEC);
-  display.print(':');
-  display.print(currentTime.minute(), DEC);
-  display.print(':');
-  display.print(currentTime.second(), DEC);
-
-  display.display();
-  delay(1000);
-}
-
-void soundAlarm() {
-  digitalWrite(BUZZER_PIN, HIGH);
-  delay(1000); // Alarme sonne pendant 1 seconde
-  digitalWrite(BUZZER_PIN, LOW);
-  alarmSet = false; // Réinitialise l'alarme
-}
