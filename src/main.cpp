@@ -3,15 +3,27 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+// Déclaration de l'écran OLED
+
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
+// Déclaration des boutons de reglage
+
+#define BUTTON_HOUR_PIN 2
+#define BUTTON_MINUTE_PIN 3
+#define BUZZER_PIN 4
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-RTC_DS1307 rtc;
-const int ledPin = 13;
+// Création de l'objet RTC
 
-void setup() {
+RTC_DS1307 rtc;
+
+DateTime alarmTime;
+bool alarmSet = false;
+
+void setup() {            // vérification que le systeme reconnait bien les composants
   Serial.begin(9600);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -19,7 +31,7 @@ void setup() {
     for (;;);
   }
 
-  display.clearDisplay();  // Clear the buffer
+  display.clearDisplay();  
   delay(2000);
 
   if (!rtc.begin()) {
@@ -32,31 +44,60 @@ void setup() {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
-  pinMode(ledPin, OUTPUT);  // Configuration de la broche de la LED en tant que sortie
+  pinMode(BUTTON_HOUR_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_MINUTE_PIN, INPUT_PULLUP);
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  alarmTime = DateTime(2024, 4, 1, 14, 30, 0); // Exemple avec un moment d'aujourd'hui
+  alarmSet = true;
 }
 
 void loop() {
   DateTime now = rtc.now();
 
-  // Clignotement de la LED chaque seconde
-  digitalWrite(ledPin, HIGH); // Allumer la LED
-  delay(500); // Attendre 500 millisecondes (demi-seconde)
-  digitalWrite(ledPin, LOW); // Éteindre la LED
-  delay(500); // Attendre 500 millisecondes (demi-seconde)
+  if (digitalRead(BUTTON_HOUR_PIN) == LOW) {
+    adjustTime(now, 3600); // Ajoute une heure
+  }
 
+  if (digitalRead(BUTTON_MINUTE_PIN) == LOW) {
+    adjustTime(now, 60); // Ajoute une minute
+  }
+
+  if (alarmSet && now.unixtime() >= alarmTime.unixtime()) {
+    soundAlarm();
+  }
+
+  displayTime(now);
+}
+
+void adjustTime(DateTime currentTime, int secondsToAdd) {   //permet d'eviter les erreurs quand le reglage trop rapide
+  DateTime newTime = currentTime + TimeSpan(secondsToAdd);
+  rtc.adjust(newTime);
+  delay(500); 
+}
+
+void displayTime(DateTime currentTime) {
   display.clearDisplay();
- display.setTextSize(2);
+  display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
+
   int16_t x, y;
   uint16_t w, h;
   display.getTextBounds("00:00:00", 0, 0, &x, &y, &w, &h);  // Obtient les dimensions du texte
   display.setCursor((SCREEN_WIDTH - w) / 2, (SCREEN_HEIGHT - h) / 2);
-  display.print(now.hour(), DEC);
+  display.print(currentTime.hour(), DEC);
   display.print(':');
-  display.print(now.minute(), DEC);
+  display.print(currentTime.minute(), DEC);
   display.print(':');
-  display.print(now.second(), DEC);
+  display.print(currentTime.second(), DEC);
 
   display.display();
   delay(1000);
+}
+
+void soundAlarm() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(1000); // Alarme sonne pendant 1 seconde
+  digitalWrite(BUZZER_PIN, LOW);
+  alarmSet = false; // Réinitialise l'alarme
 }
