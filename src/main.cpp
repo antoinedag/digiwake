@@ -2,6 +2,7 @@
 #include <RTClib.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Ultrasonic.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -9,11 +10,14 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 RTC_DS1307 rtc;
-
+Ultrasonic ultrasonic(9, 8);
+int tempsActuelBuzzer, tempsDepartBuzzer;
+float tempsTotalBuzzer;
 const int BUTTON_HOUR_PIN = 2;
 const int BUTTON_MINUTE_PIN = 3;
 const int BUTTON_ALARM_TOGGLE_PIN = 4;
 const int BUZZER_PIN = 5;
+int alarm =0;
 
 DateTime alarmTime;
 bool alarmActive = false;
@@ -39,10 +43,34 @@ void showTime(DateTime currentTime) { //permet d'afficher l'heure quand elle est
 }
 
 void soundAlarm() {
-  digitalWrite(BUZZER_PIN, HIGH);
-  delay(1000); 
-  digitalWrite(BUZZER_PIN, LOW);
-  alarmActive = false; // Réinitialise l'alarme
+  tone(5, 1000);
+  tempsDepartBuzzer = millis();
+  
+  while(alarmActive){
+  tempsActuelBuzzer = millis();
+  tempsTotalBuzzer = tempsActuelBuzzer - tempsDepartBuzzer;
+  
+  int dist = ultrasonic.read();
+  Serial.print(dist);
+  Serial.println(" cm");
+  
+  if(dist<10 || (tempsTotalBuzzer > 10000)){
+    Serial.println(tempsTotalBuzzer/1000);
+    alarmActive = false;
+    digitalWrite(3, HIGH);
+     // Réinitialise l'alarme
+  }
+  delay(100);
+  }
+  
+}
+
+void stopAlarm(){
+  if(alarm==1){
+    noTone(5);
+    alarm=0;
+  }
+  
 }
 
 void setup() {
@@ -74,6 +102,11 @@ void setup() {
 
   alarmTime = DateTime(2024, 5, 1, 7, 30, 0); // Exemple avec un moment d'aujourd'hui
   alarmActive = true; 
+  
+  pinMode(3, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(3),stopAlarm, CHANGE);
+  pinMode(BUZZER_PIN, OUTPUT); 
+  digitalWrite(3, LOW);
 }
 
 void loop() {
@@ -91,10 +124,10 @@ void loop() {
   }
 
   if (alarmActive && now >= alarmTime) {
+    alarm = 1;
     soundAlarm();
   }
 
   showTime(now);
   delay(100); 
 }
-
