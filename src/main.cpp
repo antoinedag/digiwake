@@ -3,6 +3,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Ultrasonic.h>
+#include <BitBang_I2C.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -13,10 +14,11 @@ RTC_DS1307 rtc;
 Ultrasonic ultrasonic(9, 8);
 int tempsActuelBuzzer, tempsDepartBuzzer;
 float tempsTotalBuzzer;
-const int BUTTON_HOUR_PIN = 2;
-const int BUTTON_MINUTE_PIN = 3;
-const int BUTTON_ALARM_TOGGLE_PIN = 4;
-const int BUZZER_PIN = 5;
+const int LED_PIN = 3;
+const int BUTTON_HOUR_PIN = A2;
+const int BUTTON_MINUTE_PIN = A3;
+const int BUTTON_ALARM_TOGGLE_PIN = A1;
+const int BUZZER_PIN = 3;
 int alarm =0;
 
 DateTime alarmTime;
@@ -61,8 +63,7 @@ void soundAlarm() {
      // Réinitialise l'alarme
   }
   delay(100);
-  }
-  
+  } 
 }
 
 void stopAlarm(){
@@ -70,11 +71,11 @@ void stopAlarm(){
     noTone(5);
     alarm=0;
   }
-  
 }
 
 void setup() {
   Serial.begin(9600);
+  pinMode(LED_PIN, OUTPUT);
   pinMode(BUTTON_HOUR_PIN, INPUT_PULLUP);
   pinMode(BUTTON_MINUTE_PIN, INPUT_PULLUP);
   pinMode(BUTTON_ALARM_TOGGLE_PIN, INPUT_PULLUP);
@@ -127,6 +128,12 @@ void loop() {
     alarm = 1;
     soundAlarm();
   }
+
+  // Clignotement de la LED chaque seconde
+  digitalWrite(LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(LED_PIN, LOW);
+  delay(500);
 
   showTime(now);
   delay(100); 
