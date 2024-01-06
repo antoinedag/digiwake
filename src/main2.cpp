@@ -3,7 +3,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Ultrasonic.h>
-#include <EEPROM.h>
+#include <Encoder.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -22,18 +22,24 @@ const int BUZZER_PIN = 5;
 int alarm = 0;
 int heureAlarme = 12;
 int minuteAlarme = 58;
+bool settingMode = false; // false pour le réglage de l'alarme, true pour le réglage de l'heure
 
 DateTime alarmTime;
 bool alarmActive = false;
 
+// Déclarations pour l'encodeur
+const int ENCODER_CLK_PIN = 4; 
+const int ENCODER_DT_PIN = 5;  
+Encoder myEncoder(ENCODER_CLK_PIN, ENCODER_DT_PIN);
+long oldPosition  = -999;
+
 void adjustTime(DateTime currentTime, int secondsToAdd) {
   DateTime newTime = currentTime + TimeSpan(secondsToAdd);
   rtc.adjust(newTime);
-  delay(500); // Permet d'éviter les problemes quand saisie trop rapide avec le delay
 }
 
 void showTime(DateTime currentTime) {
- DateTime now = rtc.now();
+  DateTime now = rtc.now();
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
@@ -41,7 +47,7 @@ void showTime(DateTime currentTime) {
   display.print("R");
   display.setCursor(32, 10);
   display.print(heureAlarme);
-   display.print(':');
+  display.print(':');
   display.print(minuteAlarme);
   display.setCursor(5, 40);
   display.print("H");
@@ -53,8 +59,6 @@ void showTime(DateTime currentTime) {
   display.display();
   delay(1000);
 }
-
-
 
 void soundAlarm() {
   tone(BUZZER_PIN, 1000);
@@ -73,7 +77,6 @@ void soundAlarm() {
       alarmActive = false;
       noTone(BUZZER_PIN);
       digitalWrite(LED_PIN, HIGH);
-      // Réinitialise l'alarme
     }
     delay(100);
   }
@@ -94,18 +97,14 @@ void setup() {
   pinMode(BUTTON_ALARM_TOGGLE_PIN, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // vérification que le systeme reconnait bien les composants
-
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // NB: Normalement,0x3C c'est l'adresse I2C de l'écran
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ;
+    for (;;);
   }
 
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
-    while (1)
-      ;
+    while (1);
   }
 
   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -113,43 +112,66 @@ void setup() {
   display.clearDisplay();
   display.display();
 
-  alarmTime = DateTime(2024, 5, 1, 7, 30, 0); // Exemple avec un moment d'aujourd'hui
+  alarmTime = DateTime(2024, 5, 1, 7, 30, 0);
   alarmActive = true;
 
   pinMode(3, OUTPUT);
   attachInterrupt(digitalPinToInterrupt(3), stopAlarm, CHANGE);
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
+
+  oldPosition = myEncoder.read();
 }
 
 void loop() {
-  
-  DateTime now = rtc.now(); // Lire l'heure actuelle
-
-  if (digitalRead(BUTTON_HOUR_PIN) == HIGH) {
-    if(heureAlarme < 23){
-    heureAlarme = heureAlarme + 1;
-    }else{
-      heureAlarme = 0;
-    }
-  }
-
-  if (digitalRead(BUTTON_MINUTE_PIN) == HIGH) {
-    if(minuteAlarme < 59){
-    minuteAlarme = minuteAlarme + 1;
-    }else{
-      minuteAlarme = 0;
-    }
-  }
+  DateTime now = rtc.now();
 
   if (digitalRead(BUTTON_ALARM_TOGGLE_PIN) == LOW) {
-    alarmActive = !alarmActive;
-    Serial.print("2");
+    settingMode = !settingMode;
     delay(200);
   }
 
-  if (alarmActive){
-    display.drawFastHLine(0, 0, SCREEN_WIDTH, SSD1306_WHITE);
+  if (settingMode) {
+    if (digitalRead(BUTTON_HOUR_PIN) == HIGH) {
+      adjustTime(now, 3600);
+      delay(200);
+    }
+    if (digitalRead(BUTTON_MINUTE_PIN) == HIGH) {
+      adjustTime(now, 60); 
+      delay(200); 
+    }
+  } else {
+    if (digitalRead(BUTTON_HOUR_PIN) == HIGH) {
+      heureAlarme = (heureAlarme + 1) % 24;
+      delay(200); 
+    }
+    if (digitalRead(BUTTON_MINUTE_PIN) == HIGH) {
+      minuteAlarme = (minuteAlarme + 1) % 60;
+      delay(200); 
+    }
+  }
+
+  // encodeur
+  long newPosition = myEncoder.read();
+  if (newPosition != oldPosition) {
+    oldPosition = newPosition;
+
+    // Réglage de l'heure ou de l'alarme
+    if (settingMode) {
+      // Réglage de l'heure
+      if (newPosition > oldPosition) {
+        adjustTime(now, 60); 
+      } else {
+        adjustTime(now, -60);
+      }
+    } else {
+      // Réglage de l'alarme
+      if (newPosition > oldPosition) {
+        minuteAlarme = (minuteAlarme + 1) % 60;
+      } else {
+        minuteAlarme = (minuteAlarme - 1 + 60) % 60;
+      }
+    }
   }
 
   if (heureAlarme == now.hour() && minuteAlarme == now.minute()) {
@@ -157,12 +179,10 @@ void loop() {
     soundAlarm();
   }
 
-  // Clignotement de la LED chaque seconde
   digitalWrite(LED_PIN, HIGH);
   delay(500);
   digitalWrite(LED_PIN, LOW);
   delay(500);
 
   showTime(now);
-  delay(100);
 }
