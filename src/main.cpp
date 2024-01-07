@@ -3,10 +3,13 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Ultrasonic.h>
+#include <EEPROM.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
+#define MEMORY_START 1
+byte nombreValeurs=0;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 RTC_DS1307 rtc;
@@ -53,6 +56,31 @@ void showTime(DateTime currentTime) {
   delay(1000);
 }
 
+void ecrireTempsEcoule(float temps){
+  
+  nombreValeurs = EEPROM.read(0);
+  if(nombreValeurs==255){
+    EEPROM.put(MEMORY_START, temps);
+    nombreValeurs++;
+    EEPROM.update(0, nombreValeurs);
+  }else{
+    EEPROM.put(4*nombreValeurs+MEMORY_START,temps);
+    nombreValeurs++;
+    EEPROM.update(0, nombreValeurs);
+  }
+
+}
+void AfficherTempsEcoule(){
+int valeurs;
+nombreValeurs = EEPROM.read(0);
+for (int i = nombreValeurs-10; i < nombreValeurs; i++)
+{
+  EEPROM.get(4*i+MEMORY_START, valeurs);
+  Serial.print(valeurs);
+}
+}
+
+
 void soundAlarm() {
   tone(BUZZER_PIN, 1000);
   tempsDepartBuzzer = millis();
@@ -66,6 +94,7 @@ void soundAlarm() {
     Serial.println(" cm");
 
     if (dist < 10 || (tempsTotalBuzzer > 10000)) {
+      ecrireTempsEcoule(tempsTotalBuzzer/1000);
       Serial.println(tempsTotalBuzzer / 1000);
       alarmActive = false;
       noTone(BUZZER_PIN);
