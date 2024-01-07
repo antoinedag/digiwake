@@ -4,6 +4,7 @@
 #include <Adafruit_SSD1306.h>
 #include <Ultrasonic.h>
 #include <EEPROM.h>
+#include <TimerOne.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -17,17 +18,31 @@ Ultrasonic ultrasonic(9, 8);
 int tempsActuelBuzzer, tempsDepartBuzzer;
 float tempsTotalBuzzer;
 const int LED_PIN = 2;
-const int BUTTON_HOUR_PIN = A2;
-const int BUTTON_MINUTE_PIN = A3;
+const int BUTTON_HOUR_PIN = A3;
+const int BUTTON_MINUTE_PIN = A2;
 const int BUTTON_ALARM_TOGGLE_PIN = A1;
+const int BUTTON_FORMAT_TOGGLE_PIN = 3;  // Nouveau bouton pour le changement de format d'heure
 const int BUZZER_PIN = 5;
 int alarm = 0;
 int heureAlarme = 12;
 int minuteAlarme = 58;
-bool settingMode = false; // false pour le réglage de l'alarme, true pour le réglage de l'heure
+bool settingMode = false;
+bool isNumberDisplayed = false;
+int displayedNumber = 0;
+bool is24HourFormat = true;  // Variable pour stocker le format d'heure
 
 DateTime alarmTime;
 bool alarmActive = false;
+
+void playMelody() {
+  int melody[] = {262, 330, 392, 523, 659, 784, 1046};  // Exemple de fréquences
+  int noteDuration = 500;  // Durée de chaque note en millisecondes
+
+  for (int i = 0; i < 7; i++) {
+    tone(BUZZER_PIN, melody[i], noteDuration);
+    delay(noteDuration + 50);  // Pause entre les notes
+  }
+}
 
 void adjustTime(DateTime currentTime, int secondsToAdd) {
   DateTime newTime = currentTime + TimeSpan(secondsToAdd);
@@ -47,8 +62,18 @@ void showTime(DateTime currentTime) {
   display.print(minuteAlarme);
   display.setCursor(5, 40);
   display.print("H");
-  display.setCursor(32, 40);
-  display.print(now.hour(), DEC);
+  
+  if (is24HourFormat) {
+    display.setCursor(32, 40);
+    display.print(now.hour(), DEC);
+  } else {
+    // Convertir l'heure au format 12 heures
+    int hour12 = now.hour() % 12;
+    hour12 = (hour12 == 0) ? 12 : hour12;  // Mettez 12 au lieu de 0 pour minuit
+    display.setCursor(32, 40);
+    display.print(hour12, DEC);
+  }
+
   display.print(':');
   display.print(now.minute(), DEC);
 
@@ -57,32 +82,30 @@ void showTime(DateTime currentTime) {
 }
 
 void ecrireTempsEcoule(float temps){
-  
   nombreValeurs = EEPROM.read(0);
   if(nombreValeurs==255){
     EEPROM.put(MEMORY_START, temps);
     nombreValeurs++;
     EEPROM.update(0, nombreValeurs);
-  }else{
+  } else {
     EEPROM.put(4*nombreValeurs+MEMORY_START,temps);
     nombreValeurs++;
     EEPROM.update(0, nombreValeurs);
   }
-
 }
+
 void AfficherTempsEcoule(){
-int valeurs;
-nombreValeurs = EEPROM.read(0);
-for (int i = nombreValeurs-10; i < nombreValeurs; i++)
-{
-  EEPROM.get(4*i+MEMORY_START, valeurs);
-  Serial.print(valeurs);
+  int valeurs;
+  nombreValeurs = EEPROM.read(0);
+  for (int i = nombreValeurs-10; i < nombreValeurs; i++)
+  {
+    EEPROM.get(4*i+MEMORY_START, valeurs);
+    Serial.print(valeurs);
+  }
 }
-}
-
 
 void soundAlarm() {
-  tone(BUZZER_PIN, 1000);
+  playMelody();
   tempsDepartBuzzer = millis();
 
   while (alarmActive) {
@@ -117,6 +140,7 @@ void setup() {
   pinMode(BUTTON_HOUR_PIN, INPUT_PULLUP);
   pinMode(BUTTON_MINUTE_PIN, INPUT_PULLUP);
   pinMode(BUTTON_ALARM_TOGGLE_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_FORMAT_TOGGLE_PIN, INPUT_PULLUP);  // Nouveau bouton pour le changement de format d'heure
   pinMode(BUZZER_PIN, OUTPUT);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -145,15 +169,21 @@ void setup() {
 
 void loop() {
   DateTime now = rtc.now();
+  int buttonState = digitalRead(BUTTON_ALARM_TOGGLE_PIN);
 
   if (digitalRead(BUTTON_ALARM_TOGGLE_PIN) == LOW) {
     settingMode = !settingMode;
     delay(200); 
   }
 
+  if (digitalRead(BUTTON_FORMAT_TOGGLE_PIN) == LOW) {
+    is24HourFormat = !is24HourFormat;
+    delay(200);
+  }
+
   if (settingMode) {
     if (digitalRead(BUTTON_HOUR_PIN) == HIGH) {
-      adjustTime(now, 3600); 
+      adjustTime(now, 3600);
       delay(200); 
     }
     if (digitalRead(BUTTON_MINUTE_PIN) == HIGH) {
@@ -168,6 +198,19 @@ void loop() {
     if (digitalRead(BUTTON_MINUTE_PIN) == HIGH) {
       minuteAlarme = (minuteAlarme + 1) % 60;
       delay(200); 
+    }
+  }
+
+  if (buttonState == HIGH) {
+    delay(100);
+    isNumberDisplayed = !isNumberDisplayed;
+    if (isNumberDisplayed) {
+      // Afficher le chiffre
+      display.setTextSize(2);
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(100, 25);
+      display.print(displayedNumber);
+      display.display();
     }
   }
 
