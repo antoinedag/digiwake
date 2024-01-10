@@ -4,7 +4,7 @@
 #include <Adafruit_SSD1306.h>
 #include <Ultrasonic.h>
 #include <EEPROM.h>
-#include <TimerOne.h>
+#include <MsTimer2.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -26,7 +26,7 @@ const int BUZZER_PIN = 5;
 const int LED_ALARM = 6;
 int alarm = 0;
 int heureAlarme = 10;
-int minuteAlarme = 53;
+int minuteAlarme = 27;
 bool settingMode = false;
 bool isNumberDisplayed = false;
 int displayedNumber = 0;
@@ -106,7 +106,6 @@ void AfficherTempsEcoule(){
 }
 
 void soundAlarm() {
-
   tempsDepartBuzzer = millis();
   
 
@@ -119,15 +118,18 @@ void soundAlarm() {
     Serial.print(dist);
     Serial.println(" cm");
 
-    if ((dist > 0 && dist < 10) || (tempsTotalBuzzer > 10000)) {
-      ecrireTempsEcoule(tempsTotalBuzzer/1000);
-      Serial.println(tempsTotalBuzzer / 1000);
-      alarmActive = false;
-      noTone(5);
-    //  digitalWrite(6, HIGH);
-    }else{
-    //digitalWrite(LED_ALARM, LOW);
-    delay(100);
+    if (dist > 0 ){
+
+       if (dist < 10 || (tempsTotalBuzzer > 10000)) {
+       ecrireTempsEcoule(tempsTotalBuzzer/1000);
+       Serial.println(tempsTotalBuzzer / 1000);
+       alarmActive = false;
+       noTone(5);
+       digitalWrite(LED_ALARM, HIGH);
+       }else{
+       digitalWrite(LED_ALARM, LOW);
+       delay(100);
+       }
   }
   }
 }
@@ -210,16 +212,14 @@ void loop() {
     }
   }
 
+ if (minuteAlarme != now.minute()) {
+    alarmActive = true;
+  }
 
   if (heureAlarme == now.hour() && minuteAlarme == now.minute()) {
     alarm = 1;
     soundAlarm();
   }
-
-  //digitalWrite(LED_PIN, HIGH);
-  //delay(500);
-  //digitalWrite(LED_PIN, LOW);
-  //delay(500);
 
   showTime(now);
 }
